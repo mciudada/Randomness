@@ -46,7 +46,7 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardL: int)-> bool:
 
             # NS constraint
             Q_BCCX =  Q_ABCCX.sum(axis=0)
-            m.addConstr(Q_BCCX[...,0] == Q_BCCX[...,1:], name="NS constraint")
+            m.addConstr(Q_BCCX[...,:1] == Q_BCCX[...,1:], name="NS constraint")
             
             # Introduce Q_ACCX, Q_CC, Q_AX to capture nonlinear constraint
             Q_ACCX = Q_ABCCX.sum(axis=1)
@@ -78,24 +78,27 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardL: int)-> bool:
             cardY = cardC**cardL
             cardE = cardB
             cardS = cardY
-            cardinalities_R = ((cardA,cardB,cardE,cardL,cardY,cardS,))
+            cardinalities_R = (cardA,cardB,cardE,cardL,cardY,cardS)
             R_ABEXYS = m.addMVar(cardinalities_R, lb=0, name="R_ABEXYS")
             for x, y, s in np.ndindex(cardL, cardY, cardY):
                 m.addConstr(R_ABEXYS[...,x,y,s].sum() <= 1, name="Normalization") #Needed?
             
             # No-signaling constraints for R
             R_ABXYS = R_ABEXYS.sum(axis=2)
-            m.addConstr(R_ABXYS[:,:,:,:,0] == R_ABXYS[:,:,:,:,1:], name="NS for S")
+            m.addConstr(R_ABXYS[:,:,:,:,:1] == R_ABXYS[:,:,:,:,1:], name="NS for S")
             R_AEXYS = R_ABEXYS.sum(axis=1)
-            m.addConstr(R_AEXYS[:,:,:,0,:] == R_AEXYS[:,:,:,1:,:], name="NS for Y")
+            m.addConstr(R_AEXYS[:,:,:,:1,:] == R_AEXYS[:,:,:,1:,:], name="NS for Y")
             R_BEXYS = R_ABEXYS.sum(axis=0)
-            m.addConstr(R_BEXYS[:, :, 0, :, :] == R_BEXYS[:, :, 1:, :,:], name="NS for X")
+            m.addConstr(R_BEXYS[:,:,:1,:,:] == R_BEXYS[:,:,1:,:,:], name="NS for X")
 
             
             # Conditional of Q for compatibility constraint
-            Q_ABcondXCC = R_ABXYS[:,:,:,:,0].reshape((cardA, cardB, cardL)+unpacked_C_cardinalities)
-            Q_CC_reshaped_for_conditioning = Q_CC.reshape(Q_CC.shape + tuple(repeat(1, times=cardA)) + tuple(repeat(1, times=cardL)))
-            m.addConstr(Q_ABCCX == Q_ABcondXCC*Q_CC_reshaped_for_conditioning)
+            R_ABYX = m.addMVar((cardA,cardB,cardY,cardL), lb=0, name="R_ABYX") #Weird order on purpose
+            for (x, y) in np.ndindex(cardL, cardY):
+                m.addConstr(R_ABXYS[:,:,x,y,0] == R_ABYX[:,:,y,x], name="R_ABYX transposed R_ABYX")
+            Q_CC_reshaped_for_conditioning = Q_CC.reshape((1,1,cardY,1))
+            Q_ABCCX_reshaped_for_conditioning = Q_ABCCX.reshape(R_ABYX.shape)
+            m.addConstr(Q_ABCCX_reshaped_for_conditioning == R_ABYX*Q_CC_reshaped_for_conditioning)
             
             # need to finish this, one constraint is missing
             for (a,e,x,y) in np.ndindex(cardB, cardE, cardL, cardY):
@@ -142,3 +145,11 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardL: int)-> bool:
             m.dispose()
         env.dispose()
     return current_status_string
+
+if __name__ == "__main__":
+    from probabilities import prob_RGB3
+
+    RGB3_specific = prob_RGB3(1/np.sqrt(2),0.95)
+    print("Normalization check:", RGB3_specific.sum())
+
+    print(check_bipartite_lack_randomness(RGB3_specific, cardL=2))
