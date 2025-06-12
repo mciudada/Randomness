@@ -39,7 +39,7 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardL: int)-> bool:
 
             # Introduce core MVars, Q_ABCC and Q_L, from which everything else is derived.
             Q_ABCCX = m.addMVar(unpacked_all_cardinalities, lb=0, name="Q_ABCCX")
-            for x in np.ndindex(cardL):
+            for x in range(cardL):
                 m.addConstr(Q_ABCCX[...,x].sum() <= 1, name="Unpacked Normalization")
             Q_L = m.addMVar((cardL,), lb=0, name="Q_L")
             m.addConstr(Q_L.sum() == 1, name="Normalization of hidden L")
@@ -101,9 +101,9 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardL: int)-> bool:
             m.addConstr(Q_ABCCX_reshaped_for_conditioning == R_ABYX*Q_CC_reshaped_for_conditioning)
             
             # need to finish this, one constraint is missing
-            for (a,e,x,y) in np.ndindex(cardB, cardE, cardL, cardY):
-                if not a==e:
-                    m.addConstr(R_BEXYS[a,e,x,y,y] == 0, name="Perfect prediction")
+            for (b,e,x,y) in np.ndindex(cardB, cardE, cardL, cardY):
+                if not b==e:
+                    m.addConstr(R_BEXYS[b,e,x,y,y] == 0, name="Perfect prediction")
 
             
             
