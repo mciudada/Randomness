@@ -1,5 +1,5 @@
 import gurobipy as gp
-from gurobipy import GRB
+from helpers import status_dict, customize_model_for_nonlinear_SAT, create_NS_distribution
 from itertools import repeat
 import numpy as np
 
@@ -16,54 +16,43 @@ def check_total_lack_randomness(p_ABC: np.ndarray, cardX: int) -> bool:
     with (gp.Env(empty=True) as env):
         env.start()
         with gp.Model("qcp", env=env) as m:
-            m.params.NonConvex = 2
-            m.setParam('FeasibilityTol', tol)
-            m.setParam('OptimalityTol', 0.01)
-            m.setParam('TimeLimit', time_limit)
-            m.setParam('Presolve', 0)
-            m.setParam('PreSparsify', 1)
-            m.setParam('PreQLinearize', 1)
-            m.setParam('PreDepRow', 1)
-            m.setParam('Symmetry', 2)
-            m.setParam('Heuristics', 1.0)
-            m.setParam('RINS', 0)
-            m.setParam('MIPFocus', 1)
-            m.setParam('MinRelNodes', 0)
-            m.setParam('ZeroObjNodes', 0)
-            m.setParam('ImproveStartGap', 0)
-            m.setParam('PartitionPlace', 31)
+            customize_model_for_nonlinear_SAT(m)
 
             # Define fully unpacked probabilities
             unpacked_C_cardinalities = tuple(repeat(cardC, times=cardX))
             unpacked_all_cardinalities = (cardA, cardB) + unpacked_C_cardinalities + (cardX,)  # this corresponds to ABC0C1...X
 
-            # Introduce core MVars, Q_ABCC and Q_L, from which everything else is derived.
-            Q_ABCCX = m.addMVar(unpacked_all_cardinalities, lb=0, ub=1, name="Q_ABCCX")
-            for x in range(cardX):
-                m.addConstr(Q_ABCCX[..., x].sum() <= 1, name="Unpacked Normalization") #Really?
-            Q_X = m.addMVar((cardX,), lb=0, ub=1, name="Q_X")
-            m.addConstr(Q_X.sum() == 1, name="Normalization of hidden L")
-
-            # NS constraint
-            Q_BCCX = Q_ABCCX.sum(axis=0)
-            m.addConstr(Q_BCCX[..., :1] == Q_BCCX[..., 1:], name="NS constraint")
-
-            # Introduce Q_ACCX, Q_CC, Q_AX to capture nonlinear constraint
+            Q_ABCCX = create_NS_distribution(m,
+                                             outcome_cardinalities=((cardA, cardB) + unpacked_C_cardinalities),
+                                             setting_cardinalities={0: cardX},
+                                             name="Q_ABCCX",
+                                             impose_normalization=True)
+            Q_X = create_NS_distribution(m,
+                                             outcome_cardinalities=(cardX,),
+                                             setting_cardinalities=dict(),
+                                             name="Q_X",
+                                             impose_normalization=True)
+            Q_AX = create_NS_distribution(m,
+                                          outcome_cardinalities=(cardA,),
+                                          setting_cardinalities={0: cardX},
+                                          name="Q_AX",
+                                          impose_normalization=False)
+            Q_CC = create_NS_distribution(m,
+                                          outcome_cardinalities=unpacked_C_cardinalities,
+                                          setting_cardinalities=dict(),
+                                          name="Q_CC",
+                                          impose_normalization=False)
+            axes_of_CC = tuple(range(2, cardX + 2))
+            m.addConstr(Q_AX == Q_ABCCX.sum(axis=axes_of_CC), name="Q_AX from Q_ABCCX")
+            axes_of_A = (0, 1)
+            m.addConstr(Q_CC == Q_ABCCX[..., 0].sum(axis=axes_of_A), name="Q_CC from Q_ABCCX")
             Q_ACCX = Q_ABCCX.sum(axis=1)
-            # m.addConstr(Q_ACCX == Q_ABCCX.sum(axis=1), name="Q_ACCX from Q_ABCCX")
-            Q_AX = m.addMVar((cardA, cardX), lb=0, ub=1, name="Q_AX")
-            Q_CC = m.addMVar(unpacked_C_cardinalities, lb=0, ub=1, name="Q_CC")
-            axes_of_CC = tuple(range(1, cardX + 1))
-            m.addConstr(Q_AX == Q_ACCX.sum(axis=axes_of_CC), name="Q_AX from Q_ACCX")
-            axes_of_A = 0
-            m.addConstr(Q_CC == Q_ACCX.sum(axis=axes_of_A)[..., 0], name="Q_CC from Q_ACCX")
-
-            # Nonlinear constraint: Q_ACCX = Q_AX * Q_CC
-            Q_AX_reshaped_for_multiplication = Q_AX.reshape((cardA,) + tuple(repeat(1, times=(cardX))) + (cardX,))
+            Q_AX_reshaped_for_multiplication = Q_AX.reshape((cardA,) + tuple(repeat(1, times=cardX)) + (cardX,))
             Q_CC_reshaped_for_multiplication = Q_CC.reshape((1,) + Q_CC.shape + (1,))
-
             m.addConstr(Q_ACCX == Q_AX_reshaped_for_multiplication * Q_CC_reshaped_for_multiplication,
                         name="Q_ACCX = Q_AX * Q_CC")
+
+
 
             # Linear constraint: P_ABC relates to Q_LABCC
             temp = gp.MQuadExpr.zeros(p_ABC.shape)
@@ -84,23 +73,18 @@ def check_total_lack_randomness(p_ABC: np.ndarray, cardX: int) -> bool:
             cardE = cardEa * cardEb
             cardS = cardSx * cardSy
 
-            cardinalities_R = (cardA, cardB, cardE, cardX, cardY, cardS)
-            R_ABEabXYSxy = m.addMVar(cardinalities_R, lb=0, ub=1, name="R_ABEaEbXYSxSy")
-            for settings in np.ndindex(cardX, cardY, cardS):
-                m.addConstr(R_ABEabXYSxy[..., settings].sum() <= 1, name="Normalization")  # Needed?
+            R_ABEabXYSxy = create_NS_distribution(m,
+                                             outcome_cardinalities=(cardA, cardB, cardE),
+                                             setting_cardinalities={0: cardX, 1: cardY, 2: cardS},
+                                             name="R_ABEabXYSxy",
+                                             impose_normalization=True)
 
-            # No-signaling constraints for R
-            R_ABXYSxSy = R_ABEabXYSxy.sum(axis=2)
-            m.addConstr(R_ABXYSxSy[:, :, :, :, :1] == R_ABXYSxSy[:, :, :, :, 1:], name="NS for S")
-            R_AEXYS = R_ABEabXYSxy.sum(axis=1)
-            m.addConstr(R_AEXYS[:, :, :, :1, :] == R_AEXYS[:, :, :, 1:, :], name="NS for Y")
-            R_BEXYS = R_ABEabXYSxy.sum(axis=0)
-            m.addConstr(R_BEXYS[:, :, :1, :, :] == R_BEXYS[:, :, 1:, :, :], name="NS for X")
 
             # Conditional of Q for compatibility constraint
             R_ABYX = m.addMVar((cardA, cardB, cardY, cardX), lb=0, ub=1, name="R_ABYX")  # Weird order on purpose
+            R_ABXY = R_ABEabXYSxy[...,0].sum(axis=2)
             for (x, y) in np.ndindex(cardX, cardY):
-                m.addConstr(R_ABXYSxSy[:, :, x, y, 0] == R_ABYX[:, :, y, x], name="R_ABYX transposed R_ABYX")
+                m.addConstr(R_ABXY[:, :, x, y] == R_ABYX[:, :, y, x], name="R_ABYX transposed R_ABYX")
             Q_CC_reshaped_for_conditioning = Q_CC.reshape((1, 1, cardY, 1))
             Q_ABCCX_reshaped_for_conditioning = Q_ABCCX.reshape(R_ABYX.shape)
             m.addConstr(Q_ABCCX_reshaped_for_conditioning == R_ABYX * Q_CC_reshaped_for_conditioning)
@@ -115,33 +99,11 @@ def check_total_lack_randomness(p_ABC: np.ndarray, cardX: int) -> bool:
                 if not a == ea:
                     m.addConstr(R_ABEabXYSxy_reshaped_for_perfect_prediction[a, :, ea, :, x, :, x, :] == 0, name="Perfect prediction of Alice")
 
-            m.setObjective(0.0, GRB.MAXIMIZE)
-            m.Params.NonConvex = 2
 
             m.update()
-            current_status = m.getAttr("Status")
-            gurobi_status_codes = [
-                'LOADED',
-                'OPTIMAL',
-                'INFEASIBLE',
-                'INF_OR_UNBD',
-                'UNBOUNDED',
-                'CUTOFF',
-                'ITERATION_LIMIT',
-                'NODE_LIMIT',
-                'TIME_LIMIT',
-                'SOLUTION_LIMIT',
-                'INTERRUPTED',
-                'NUMERIC',
-                'SUBOPTIMAL',
-                'INPROGRESS',
-                'USER_OBJ_LIMIT',
-                'WORK_LIMIT']
-            if current_status == 1:
-                m.optimize()
-                current_status = m.getAttr("Status")
-                current_status_string = gurobi_status_codes[current_status - 1]
-                print(f"Status: {current_status_string}")
+            m.optimize()
+            status_message = status_dict.get(m.status, f"Unknown status ({m.status})")
+            print(f"Model status: {m.status} - {status_message}")
             if m.getAttr("SolCount"):
                 record_to_preserve = dict()
                 for var in m.getVars():
@@ -151,7 +113,7 @@ def check_total_lack_randomness(p_ABC: np.ndarray, cardX: int) -> bool:
 
             m.dispose()
         env.dispose()
-    return current_status_string
+    return status_message
 
 
 if __name__ == "__main__":
