@@ -1,119 +1,91 @@
 import gurobipy as gp
-from gurobipy import GRB
 from itertools import repeat
 import numpy as np
-from qutip import *
+from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility
 
-time_limit = GRB.INFINITY
-tol = 1e-5
-return_dist = True
-print_model = True
 
-def test_two_classical_sources(p_ABC: np.ndarray, cardL: int)-> bool:
+def impose_two_classical_sources(m: gp._model.Model,
+                                 p_ABC: np.ndarray,
+                                 cardX: int):
     (cardA, cardB, cardC) = p_ABC.shape
-    rL = tuple(range(cardL))
+    # Define fully unpacked probabilities
+    unpacked_C_cardinalities = tuple(repeat(cardC, times=cardX))
+    # Instantiate variables
+    Q_ABCCX = create_NS_distribution(m,
+                                     outcome_cardinalities=((cardA, cardB) + unpacked_C_cardinalities),
+                                     setting_cardinalities={0: cardX},
+                                     name="Q_ABCCX",
+                                     impose_normalization=True)
+    Q_X = create_NS_distribution(m,
+                                 outcome_cardinalities=(cardX,),
+                                 setting_cardinalities=dict(),
+                                 name="Q_X",
+                                 impose_normalization=True)
+    Q_AX = create_NS_distribution(m,
+                                  outcome_cardinalities=(cardA,),
+                                  setting_cardinalities={0: cardX},
+                                  name="Q_AX",
+                                  impose_normalization=False, impose_nosignalling=False)
+    Q_CC = create_NS_distribution(m,
+                                  outcome_cardinalities=unpacked_C_cardinalities,
+                                  setting_cardinalities=dict(),
+                                  name="Q_CC",
+                                  impose_normalization=False, impose_nosignalling=False)
 
+    # # Optional constraints known to preserve feasibility for RGB3, to accelerate solution finding
+    # m.addConstr(Q_CC[0, 0] == 0)
+    # m.addConstr(Q_CC[0, 1] == 0)
+    # m.addConstr(Q_CC[1, 1] == 0)
+    # m.addConstr(Q_CC[1, 2] == 0)
+    # m.addConstr(Q_CC[2, 0] == 0)
+    # m.addConstr(Q_CC[2, 1] == 0)
+    # m.addConstr(Q_CC[2, 2] == 0)
+
+    Q_ACCX = Q_ABCCX.sum(axis=1)
+    axes_of_CC_within_ACCX = tuple(range(1, cardX + 1))
+    axes_of_AX_within_ACCX = (0, cardX + 1)
+    m.addConstr(Q_AX == Q_ACCX.sum(axis=axes_of_CC_within_ACCX), name="Q_AX from Q_ACCX")
+    m.addConstr(Q_CC == Q_ACCX[..., 0].sum(axis=axes_of_AX_within_ACCX[:1]), name="Q_CC from Q_ACCX")
+
+    AX_newshape = np.ones(Q_ACCX.ndim, dtype=int)
+    AX_newshape[list(axes_of_AX_within_ACCX)] = Q_AX.shape
+    AX_newshape = tuple(AX_newshape.tolist())
+    CC_newshape = np.ones(Q_ACCX.ndim, dtype=int)
+    CC_newshape[list(axes_of_CC_within_ACCX)] = Q_CC.shape
+    CC_newshape = tuple(CC_newshape.tolist())
+
+    Q_AX_reshaped_for_multiplication = Q_AX.reshape(AX_newshape)
+    Q_CC_reshaped_for_multiplication = Q_CC.reshape(CC_newshape)
+    m.addConstr(Q_ACCX == Q_AX_reshaped_for_multiplication * Q_CC_reshaped_for_multiplication,
+                name="Q_ACCX = Q_AX * Q_CC")
+
+    # Linear constraint: P_ABC relates to Q_LABCC
+    axes_of_CC_within_ABCCX = tuple(range(2, cardX + 2))
+    temp = gp.MQuadExpr.zeros(p_ABC.shape)
+    for x in range(cardX):
+        axes_to_trace_out = axes_of_CC_within_ABCCX[:x] + axes_of_CC_within_ABCCX[x + 1:]
+        temp += Q_X[x] * Q_ABCCX[..., x].sum(axis=axes_to_trace_out)
+    m.addConstr(p_ABC == temp, name="P_ABC from Q_LAABCC")
+    return Q_ABCCX, Q_X, Q_AX, Q_CC
+
+
+def check_singlepartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=False) -> str:
     with (gp.Env(empty=True) as env):
         env.start()
         with gp.Model("qcp", env=env) as m:
-            m.params.NonConvex = 2  # Using quadratic equality constraints.
-            m.setParam('FeasibilityTol', tol)
-            m.setParam('OptimalityTol', 0.01)
-            m.setParam('TimeLimit', time_limit)
-            m.setParam('Presolve', 0)
-            m.setParam('PreSparsify', 1)
-            m.setParam('PreQLinearize', 1)
-            m.setParam('PreDepRow', 1)
-            m.setParam('Symmetry', 2)
-            m.setParam('Heuristics', 1.0)
-            m.setParam('RINS', 0)
-            m.setParam('MIPFocus', 1)
-            m.setParam('MinRelNodes', 0)
-            m.setParam('ZeroObjNodes', 0)
-            m.setParam('ImproveStartGap', 0)
-            m.setParam('PartitionPlace', 31)
-
-            # Define fully unpacked probabilities
-            unpacked_C_cardinalities = tuple(repeat(cardC, times=cardL))
-            unpacked_all_cardinalities = (cardA,) + (cardB,) + unpacked_C_cardinalities + (cardL,) 
-
-            # Introduce core MVars, Q_ABCC and Q_L, from which everything else is derived.
-            Q_ABCCX = m.addMVar(unpacked_all_cardinalities, lb=0, name="Q_ABCCX")
-            for x in np.ndindex(cardL):
-                m.addConstr(Q_ABCCX[...,x].sum() <= 1, name="Unpacked Normalization")
-            Q_L = m.addMVar((cardL,), lb=0, name="Q_L")
-            m.addConstr(Q_L.sum() == 1, name="Normalization of hidden L")
-
-            # NS constraint
-            Q_BCCX = m.addMVar((cardB,)+unpacked_C_cardinalities+(cardL,), lb=0, name="Q_BCCX")
-            m.addConstr(Q_BCCX == Q_ABCCX.sum(axis=0), name="Q_BCCX from Q_ABCCX")
-            for x in tuple(range(cardL-1)):
-                m.addConstr(Q_BCCX[...,x] == Q_BCCX[...,x+1], name="NS constraint")
-            
-            # Introduce Q_ACC, Q_CC, Q_AX to capture nonlinear constraint
-            Q_ACCX = m.addMVar((cardA,) + unpacked_C_cardinalities + (cardL,), name="Q_ACCZ")
-            m.addConstr(Q_ACCX == Q_ABCCX.sum(axis=1), name="Q_ACCX from Q_ABCCX")
-            Q_AX = m.addMVar((cardA,cardL), name="Q_AX")
-            Q_CC = m.addMVar(unpacked_C_cardinalities, name="Q_CC")
-            axes_of_CC = tuple(range(1,cardL+1))
-            m.addConstr(Q_AX == Q_ACCX.sum(axis=axes_of_CC), name="Q_AX from Q_ACCX")
-            axes_of_A = 0
-            m.addConstr(Q_CC == Q_ACCX.sum(axis=axes_of_A)[...,0], name="Q_CC from Q_ACCX")
-            
-            # Nonlinear constraint: Q_ACCX = Q_AX * Q_CC
-            Q_AX_reshaped_for_multiplication = Q_AX.reshape((cardA,) + tuple(repeat(1, times=(cardL))) + (cardL,))
-            Q_CC_reshaped_for_multiplication = Q_CC.reshape((1,) + Q_CC.shape + (1,))
-            
-            m.addConstr(Q_ACCX == Q_AX_reshaped_for_multiplication * Q_CC_reshaped_for_multiplication, name="Q_ACCX = Q_AX * Q_CC")
-
-            # Linear constraint: P_ABC relates to Q_LABCC 
-            # P_ABC = m.addMVar((cardA, cardB, cardC), lb=0, name="P_ABC")
-            temp = gp.MQuadExpr.zeros(p_ABC.shape)
-            default_axes_to_trace_out = set(range(cardL + 3))
-            default_axes_to_trace_out.discard(cardL+2) # removing axis for X
-            default_axes_to_trace_out.discard(0) # removing axis for A
-            default_axes_to_trace_out.discard(1) # removing axis for B
-            for l in rL:
-                axes_to_trace_out = tuple(sorted(default_axes_to_trace_out.difference({l+2})))
-                temp += Q_L[l] * Q_ABCCX[...,l].sum(axis=axes_to_trace_out)
-            m.addConstr(p_ABC == temp, name="P_ABC from Q_LAABCC")
-
-            m.setObjective(0.0, GRB.MAXIMIZE)
-            m.Params.NonConvex = 2
-
-            m.update()
-            current_status = m.getAttr("Status")
-            gurobi_status_codes = [
-                'LOADED',
-                'OPTIMAL',
-                'INFEASIBLE',
-                'INF_OR_UNBD',
-                'UNBOUNDED',
-                'CUTOFF',
-                'ITERATION_LIMIT',
-                'NODE_LIMIT',
-                'TIME_LIMIT',
-                'SOLUTION_LIMIT',
-                'INTERRUPTED',
-                'NUMERIC',
-                'SUBOPTIMAL',
-                'INPROGRESS',
-                'USER_OBJ_LIMIT',
-                'WORK_LIMIT']
-            if current_status == 1:
-                m.optimize()
-                current_status = m.getAttr("Status")
-                current_status_string = gurobi_status_codes[current_status-1]
-                print(f"Status: {current_status_string}")
-
-            if m.getAttr("SolCount"):
-                record_to_preserve = dict()
-                for var in m.getVars():
-                    record_to_preserve[var.VarName] = var.X
-                    if print_model:
-                        print(var.VarName, " := ", var.X)
-
+            customize_model_for_nonlinear_SAT(m)
+            Q_ABCCX, Q_X, Q_AX, Q_CC = impose_two_classical_sources(m, p_ABC, cardX)
+            # Perform actual optimization
+            status_message = check_feasibility(m, print_model=print_model)
             m.dispose()
         env.dispose()
-    return current_status_string
+    return status_message
 
+
+if __name__ == "__main__":
+    from probabilities import prob_RGB3
+
+    RGB3_specific = prob_RGB3(1 / np.sqrt(2), 0.95)
+    print(check_singlepartite_lack_randomness(p_ABC=RGB3_specific,
+                                               cardX=2,
+                                               print_model=True))
