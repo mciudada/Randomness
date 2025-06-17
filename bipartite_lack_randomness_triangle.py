@@ -2,6 +2,7 @@ import gurobipy as gp
 import numpy as np
 from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility
 from triangle_two_classical_sources import impose_two_classical_sources
+from collections import OrderedDict
 
 
 def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=False) -> str:
@@ -10,7 +11,7 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=F
         with gp.Model("qcp", env=env) as m:
             customize_model_for_nonlinear_SAT(m)
 
-            (Q_ABCCX, Q_X, Q_AX, Q_CC) = impose_two_classical_sources(m, p_ABC, cardX)
+            (Q_ABCC_X, Q_X, Q_CC) = impose_two_classical_sources(m, p_ABC, cardX)
 
             (cardA, cardB, cardC) = p_ABC.shape
             cardY = cardC ** cardX
@@ -18,26 +19,22 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=F
             cardS = cardY
 
             # Conditional of Q for compatibility constraint
-            R_ABYX_shape = (cardA, cardB, cardY, cardX)
-            R_ABYX = m.addMVar(R_ABYX_shape, lb=0, ub=1, name="R_ABYX")  # Weird order on purpose
-            Q_CC_reshaped_for_conditioning = Q_CC.reshape((1, 1, cardY, 1))
-            Q_ABCCX_reshaped_for_conditioning = Q_ABCCX.reshape(R_ABYX.shape)
-            m.addConstr(Q_ABCCX_reshaped_for_conditioning == R_ABYX * Q_CC_reshaped_for_conditioning)
-            # Relate R_ABYX to RABEXYS
-            R_ABEXYS = create_NS_distribution(m,
+            R_ABE_XYS = create_NS_distribution(m,
                                               outcome_cardinalities=(cardA, cardB, cardE),
-                                              setting_cardinalities={0: cardX, 1: cardY, 2: cardS},
-                                              name="R_ABEabXYSxy",
+                                              setting_cardinalities=OrderedDict([(0, cardX), (1, cardY), (2, cardS)]),
+                                              name="R_ABE_XYS",
                                               impose_normalization=True, impose_nosignalling=True)
+            R_AB_XY = R_ABE_XYS[..., 0].sum(axis=2)
+            Q_Y_reshaped_for_conditioning = Q_CC.reshape((1, 1, cardY))
+            Q_ABY_X_reshaped_for_conditioning = Q_ABCC_X.reshape((cardA, cardB, cardY, cardX))
+            for x in range(cardX):
+                m.addConstr(Q_ABY_X_reshaped_for_conditioning[:,:,:,x] == R_AB_XY[:,:,x,:] * Q_Y_reshaped_for_conditioning)
 
-            R_ABXY = R_ABEXYS[..., 0].sum(axis=2)
-            for (x, y) in np.ndindex(cardX, cardY):
-                m.addConstr(R_ABXY[:, :, x, y] == R_ABYX[:, :, y, x], name="R_ABYX transposed R_ABYX")
 
             # Impose Eve can perfectly predict Bob
             for (b, e, y) in np.ndindex(cardB, cardE, cardY):
                 if not b == e:
-                    m.addConstr(R_ABEXYS[:, b, e, :, y, y] == 0,
+                    m.addConstr(R_ABE_XYS[:, b, e, :, y, y] == 0,
                                 name="Perfect prediction of Bob")
 
             # Perform actual optimization
@@ -191,4 +188,4 @@ if __name__ == "__main__":
     RGB3_specific = prob_RGB3(1 / np.sqrt(2), 0.95)
     print(check_bipartite_lack_randomness(p_ABC=RGB3_specific,
                                           cardX=2,
-                                          print_model=True))
+                                          print_model=True)[0])

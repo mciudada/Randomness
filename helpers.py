@@ -75,15 +75,15 @@ def create_NS_distribution(m: gp._model.Model,
 #     return shape_1, shape_2
 
 def check_feasibility(m: gp._model.Model,
-                      print_model=False) -> str:
+                      print_model=False) -> (str, dict):
     m.update()
     m.optimize()
     status_message = status_dict.get(m.status, f"Unknown status ({m.status})")
     print(f"Model status: {m.status} - {status_message}")
+    record_to_preserve = dict()
     if m.getAttr("SolCount"):
-        record_to_preserve = dict()
         for var in m.getVars():
             record_to_preserve[var.VarName] = var.X
-            if print_model:
+            if print_model and np.abs(var.X) > 1e-5:
                 print(var.VarName, " := ", var.X)
-    return status_message
+    return status_message, record_to_preserve
