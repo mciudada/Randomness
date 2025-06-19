@@ -29,13 +29,13 @@ def impose_two_classical_sources(m: gp._model.Model,
                                   impose_normalization=False, impose_nosignalling=False)
 
     # # Optional constraints known to preserve feasibility for RGB3, to accelerate solution finding
-    m.addConstr(Q_CC[0, 0] == 0)
-    m.addConstr(Q_CC[0, 1] == 0)
-    m.addConstr(Q_CC[1, 1] == 0)
-    m.addConstr(Q_CC[1, 2] == 0)
-    m.addConstr(Q_CC[2, 0] == 0)
-    m.addConstr(Q_CC[2, 1] == 0)
-    m.addConstr(Q_CC[2, 2] == 0)
+    # m.addConstr(Q_CC[0, 0] == 0)
+    # m.addConstr(Q_CC[0, 1] == 0)
+    # m.addConstr(Q_CC[1, 1] == 0)
+    # m.addConstr(Q_CC[1, 2] == 0)
+    # m.addConstr(Q_CC[2, 0] == 0)
+    # m.addConstr(Q_CC[2, 1] == 0)
+    # m.addConstr(Q_CC[2, 2] == 0)
 
     # Extract marginal variables
     cardY = cardC ** cardX
@@ -73,9 +73,7 @@ def check_singlepartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_mod
 
 
 if __name__ == "__main__":
-    from probabilities import prob_RGB3
-
-    RGB3_specific = prob_RGB3(1 / np.sqrt(2), 0.95)
+    from probabilities import RGB3_specific
     print(check_singlepartite_lack_randomness(p_ABC=RGB3_specific,
                                                cardX=2,
                                                print_model=True)[0])

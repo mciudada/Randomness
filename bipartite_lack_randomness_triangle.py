@@ -47,9 +47,7 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=F
 
 
 if __name__ == "__main__":
-    from probabilities import prob_RGB3
-
-    RGB3_specific = prob_RGB3(1 / np.sqrt(2), 0.95)
+    from probabilities import RGB3_specific
     print(check_bipartite_lack_randomness(p_ABC=RGB3_specific,
                                           cardX=2,
                                           print_model=True)[0])
