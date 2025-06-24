@@ -54,8 +54,8 @@ def impose_BC_classical_and_Bob_predictable(m: gp._model.Model,
             m.addConstr(R_BCE_YZS[b, :, e, y, :, y] == 0,
                         name="Perfect prediction of Bob")
     # Impose Eve acts like symmetric extension when settings do not match.
-    for (b, y, s) in np.ndindex(cardB, cardY, cardS):
-        for e in range(b):
+    for (e, b, y, s) in np.ndindex(cardB, cardY, cardS):
+        if b>e or y>s:
             m.addConstr(R_BCE_YZS[b, :, e, y, :, s] == R_BCE_YZS[e, :, b, s, :, y],
                         name="Eve as symmetric extension.")
 
@@ -78,6 +78,5 @@ def check_Bob_lack_randomness(p_ABC_XZ: np.ndarray, print_model=False) -> str:
 if __name__ == "__main__":
     from probabilities import MNN_specific
 
-    print(check_Bob_lack_randomness(p_ABC=MNN_specific,
-                                    cardX=2,
+    print(check_Bob_lack_randomness(p_ABC_XZ=MNN_specific,
                                     print_model=True)[0])
