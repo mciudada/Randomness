@@ -19,7 +19,7 @@ def prob_RGB3(lambda_0, u):
 
 RGB3_specific = prob_RGB3(1 / np.sqrt(3), np.sqrt(0.215))
 
-def MNN_specific(theta): # note that theta cannot be pi/4
+def MNN_specific(theta): # note that theta cannot be 0, pi/4, pi/2
     p=np.zeros(32).reshape([2,2,2,2,2]) # initialization of the probability
     
     phi = bell_state(state='00') #this is |phi+>
