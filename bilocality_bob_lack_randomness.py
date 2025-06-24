@@ -53,6 +53,11 @@ def impose_BC_classical_and_Bob_predictable(m: gp._model.Model,
         if not b == e:
             m.addConstr(R_BCE_YZS[b, :, e, y, :, y] == 0,
                         name="Perfect prediction of Bob")
+    # Impose Eve acts like symmetric extension when settings do not match.
+    for (b, y, s) in np.ndindex(cardB, cardY, cardS):
+        for e in range(b):
+            m.addConstr(R_BCE_YZS[b, :, e, y, :, s] == R_BCE_YZS[e, :, b, s, :, y],
+                        name="Eve as symmetric extension.")
 
     return Q_AABC_Z, Q_AA, R_BCE_YZS
 
