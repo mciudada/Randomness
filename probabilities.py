@@ -19,16 +19,16 @@ def prob_RGB3(lambda_0, u):
 
 RGB3_specific = prob_RGB3(1 / np.sqrt(3), np.sqrt(0.215))
 
-def MNN_specific(theta): # note that theta cannot be 0, pi/4, pi/2
-    p=np.zeros(32).reshape([2,2,2,2,2]) # initialization of the probability
+def prob_MNN(theta): # note that theta cannot be 0, pi/4, pi/2
+    p=np.zeros(shape=(2,2,2,2,2)) # initialization of the probability
     
     phi = bell_state(state='00') #this is |phi+>
     rho1 = ket2dm(phi) # this is phi+ = |phi+><phi+|
     rho2 = rho1
     rho = tensor(rho1,rho2)
     
-    A=np.zeros(16,dtype = 'complex_').reshape([2,2,2,2]) # initialization of an hypermatrix A the last to indices corresponds to x and a respectively, i.e. A[:,:,0,1] is the measurement done when x=0 and a=-1 (en el ultimo indice 0 corresponde a 1 y 1 a -1)
-    C=np.zeros(16,dtype = 'complex_').reshape([2,2,2,2]) # the same for C
+    A=np.zeros(shape=(2,2,2,2),dtype=np.complex128) # initialization of an hypermatrix A the last to indices corresponds to x and a respectively, i.e. A[:,:,0,1] is the measurement done when x=0 and a=-1 (en el ultimo indice 0 corresponde a 1 y 1 a -1)
+    C=np.zeros(shape=(2,2,2,2),dtype=np.complex128) # the same for C
     
     A0 = sigmax() # measurement of A for x = 0
     A1 = sigmaz() # measurement of A for x = 1
@@ -50,7 +50,7 @@ def MNN_specific(theta): # note that theta cannot be 0, pi/4, pi/2
     C[:,:,1,0] = np.dot(eivect_C1[0],eivect_C1[0].dag()).full()
     C[:,:,1,1] = np.dot(eivect_C1[1],eivect_C1[1].dag()).full()
     
-    B=np.zeros(32,dtype = 'complex_').reshape([4,4,2]) #initialization for B (the last two indeces corresponds to b_0 and b_1
+    B=np.zeros(shape=(4,4,2),dtype=np.complex128) #initialization for B (the last two indeces corresponds to b_0 and b_1
     
     psi_theta = np.sin(theta) * basis(4,1) + np.cos(theta) * basis(4,2) 
     
@@ -62,6 +62,6 @@ def MNN_specific(theta): # note that theta cannot be 0, pi/4, pi/2
     
     return p
 
-
+MNN_specific = prob_MNN(np.pi/8)
 
 
