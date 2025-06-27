@@ -1,6 +1,6 @@
 import gurobipy as gp
 import numpy as np
-from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility
+from helpers import customize_model_for_nonlinear_SAT, create_randomless_distribution, check_feasibility
 from triangle_two_classical_sources import impose_two_classical_sources
 from collections import OrderedDict
 
@@ -15,27 +15,18 @@ def check_bipartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=F
 
             (cardA, cardB, cardC) = p_ABC.shape
             cardY = cardC ** cardX
-            cardE = cardB
-            cardS = cardY
 
-            # Conditional of Q for compatibility constraint
-            R_ABE_XYS = create_NS_distribution(m,
-                                              outcome_cardinalities=(cardA, cardB, cardE),
-                                              setting_cardinalities=OrderedDict([(0, cardX), (1, cardY), (2, cardS)]),
-                                              name="R_ABE_XYS",
-                                              impose_normalization=True, impose_nosignalling=True)
+            R_ABE_XYS = create_randomless_distribution(m,
+                                                       outcome_cardinalities=(cardA, cardB),
+                                                       setting_cardinalities={0: cardX, 1: cardY},
+                                                       who_predicted=(0,),
+                                                       name="R_ABE_XYS")
             R_AB_XY = R_ABE_XYS[..., 0].sum(axis=2)
             Q_Y_reshaped_for_conditioning = Q_CC.reshape((1, 1, cardY))
             Q_ABY_X_reshaped_for_conditioning = Q_ABCC_X.reshape((cardA, cardB, cardY, cardX))
             for x in range(cardX):
                 m.addConstr(Q_ABY_X_reshaped_for_conditioning[:,:,:,x] == R_AB_XY[:,:,x,:] * Q_Y_reshaped_for_conditioning)
 
-
-            # Impose Eve can perfectly predict Bob
-            for (b, e, y) in np.ndindex(cardB, cardE, cardY):
-                if not b == e:
-                    m.addConstr(R_ABE_XYS[:, b, e, :, y, y] == 0,
-                                name="Perfect prediction of Bob")
 
             # Perform actual optimization
             status_message = check_feasibility(m, print_model=print_model)

@@ -1,6 +1,6 @@
 import gurobipy as gp
 import numpy as np
-from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility
+from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility, create_randomless_distribution
 from collections import OrderedDict
 
 
@@ -36,28 +36,16 @@ def impose_BC_classical_and_Bob_predictable(m: gp._model.Model,
     # Next: impose Bob predicatable
     # Conditional of Q for compatibility constraint
     cardY = As_as_one_cardinality
-    cardE = cardB
-    cardS = cardY
-    R_BCE_YZS = create_NS_distribution(m,
-                                       outcome_cardinalities=(cardB, cardC, cardE),
-                                       setting_cardinalities=OrderedDict([(0, cardY), (1, cardZ), (2, cardS)]),
-                                       name="R_BCE_YZS",
-                                       impose_normalization=True, impose_nosignalling=True)
+    R_BCE_YZS = create_randomless_distribution(m,
+                                               outcome_cardinalities=(cardB, cardC),
+                                               setting_cardinalities={0: cardY, 1: cardZ},
+                                               who_predicted=(0,),
+                                               name="R_BCE_YZS")
+
     R_BC_YZ = R_BCE_YZS[..., 0].sum(axis=2)
     Q_YBC_Z_reshaped_for_conditioning = Q_AABC_Z.reshape((cardY, cardB, cardC, cardZ))
     for y in range(cardY):
         m.addConstr(Q_YBC_Z_reshaped_for_conditioning[y, :, :, :] == R_BC_YZ[:, :, y, :] * Q_AA[y])
-
-    # Impose Eve can perfectly predict Bob
-    for (b, e, y) in np.ndindex(cardB, cardE, cardY):
-        if not b == e:
-            m.addConstr(R_BCE_YZS[b, :, e, y, :, y] == 0,
-                        name="Perfect prediction of Bob")
-    # Impose Eve acts like symmetric extension when settings do not match.
-    for (e, b, y, s) in np.ndindex(cardE, cardB, cardY, cardS):
-        if b>e or y>s:
-            m.addConstr(R_BCE_YZS[b, :, e, y, :, s] == R_BCE_YZS[e, :, b, s, :, y],
-                        name="Eve as symmetric extension.")
 
     return Q_AABC_Z, Q_AA, R_BCE_YZS
 
@@ -76,7 +64,11 @@ def check_Bob_lack_randomness(p_ABC_XZ: np.ndarray, print_model=False) -> str:
 
 
 if __name__ == "__main__":
-    from probabilities import MNN_specific
+    from probabilities import prob_MNN
 
-    print(check_Bob_lack_randomness(p_ABC_XZ=MNN_specific,
+    # "First feasible, then infeasible"
+    print(check_Bob_lack_randomness(p_ABC_XZ=prob_MNN(np.pi / 4),
+                                    print_model=True)[0])
+
+    print(check_Bob_lack_randomness(p_ABC_XZ=prob_MNN(np.pi / 8),
                                     print_model=True)[0])
