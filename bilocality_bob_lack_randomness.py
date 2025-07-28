@@ -57,7 +57,7 @@ def check_Bob_lack_randomness(p_ABC_XZ: np.ndarray, print_model=False) -> str:
             customize_model_for_nonlinear_SAT(m)
             Q_AABC_Z, Q_AA, R_BCE_YZS = impose_BC_classical_and_Bob_predictable(m, p_ABC_XZ)
             # Perform actual optimization
-            status_message = check_feasibility(m, print_model=print_model)
+            status_message, variable_values = check_feasibility(m, print_model=print_model)
             m.dispose()
         env.dispose()
     return status_message

@@ -66,7 +66,7 @@ def check_singlepartite_lack_randomness(p_ABC: np.ndarray, cardX: int, print_mod
             customize_model_for_nonlinear_SAT(m)
             Q_ABCCX, Q_X, Q_CC = impose_two_classical_sources(m, p_ABC, cardX)
             # Perform actual optimization
-            status_message = check_feasibility(m, print_model=print_model)
+            status_message, variable_values = check_feasibility(m, print_model=print_model)
             m.dispose()
         env.dispose()
     return status_message

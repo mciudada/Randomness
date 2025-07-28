@@ -37,7 +37,7 @@ def check_total_lack_randomness(p_ABC: np.ndarray, cardX: int, print_model=False
 
 
             # Perform actual optimization
-            status_message = check_feasibility(m, print_model=print_model)
+            status_message, variable_values = check_feasibility(m, print_model=print_model)
 
             m.dispose()
         env.dispose()
