@@ -5,7 +5,7 @@ from helpers import customize_model_for_nonlinear_SAT, check_feasibility
 from triangle_two_classical_sources import impose_two_classical_sources
 
 
-def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True)-> str:
+def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True, stop_if_violation=10.0)-> str:
     with (gp.Env(empty=True) as env):
         env.start()
         with gp.Model("qcp", env=env) as m:
@@ -43,6 +43,7 @@ def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True)-> str:
             ineq = m.addVar(lb = -10, ub=10, name="ineq")
             m.addConstr(ineq ==3*((lambda_1**3)*(u**2)*v-(lambda_0**3)*u*(v**2))**2 - 3*(u**2)*((lambda_1**6)+(lambda_0**6)) + 2*((lambda_0**6)+((lambda_1**3)*(u**3)+(lambda_0**3)*(v**3))**2) + (lambda_1**6) + ((lambda_1**3)*(v**3)-(lambda_0**3)*(u**3))**2, name="objective")
             m.setObjective(ineq, GRB.MINIMIZE)
+            m.setParam('BestObjStop', -stop_if_violation)
 
             # Impose causal compatibility with triangle consisting of 2 classical sources, one having cardinality=cardL
             Q_ABCCX, Q_X, Q_CC = impose_two_classical_sources(m, p_ABC, cardL)
@@ -53,4 +54,4 @@ def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True)-> str:
     return status_message
 
 # Evidently, some nonclassicality is consistent with 2 classical sources, one having cardinality=2.
-print(optimal_nonclassical_bound_RGB3(2))
+print(optimal_nonclassical_bound_RGB3(2, stop_if_violation=0.2))

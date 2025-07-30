@@ -27,6 +27,11 @@ def impose_two_classical_sources(m: gp._model.Model,
                                   setting_cardinalities=dict(),
                                   name="Q_CC",
                                   impose_normalization=False, impose_nosignalling=False)
+    Q_A_X = create_NS_distribution(m,
+                                  outcome_cardinalities=(cardA,),
+                                  setting_cardinalities={0: cardX},
+                                  name="Q_A_X",
+                                  impose_normalization=False, impose_nosignalling=False)
 
     # # Optional constraints known to preserve feasibility for RGB3, to accelerate solution finding
     # m.addConstr(Q_CC[0, 0] == 0)
@@ -40,7 +45,8 @@ def impose_two_classical_sources(m: gp._model.Model,
     # Extract marginal variables
     cardY = cardC ** cardX
     Q_ACC_X = Q_ABCC_X.reshape((cardA,cardB,cardY,cardX)).sum(axis=1)
-    Q_A_X = Q_ACC_X.sum(axis=1)
+    # Q_A_X = Q_ACC_X.sum(axis=1)
+    m.addConstr(Q_A_X == Q_ACC_X.sum(axis=1), name="Q_A_X from Q_ACCX")
 
     # Define one new marginal variable for factorization convenience
     m.addConstr(Q_CC.reshape(cardY) == Q_ACC_X[..., 0].sum(axis=0), name="Q_CC from Q_ACCX")

@@ -1,7 +1,7 @@
 import gurobipy as gp
 import numpy as np
 from helpers import customize_model_for_nonlinear_SAT, create_NS_distribution, check_feasibility, create_randomless_distribution
-from collections import OrderedDict
+
 
 
 def impose_BC_classical_and_Bob_predictable(m: gp._model.Model,
@@ -18,10 +18,21 @@ def impose_BC_classical_and_Bob_predictable(m: gp._model.Model,
                                       impose_normalization=True, impose_nosignalling=True)
 
     Q_AAC_Z = Q_AABC_Z.reshape((As_as_one_cardinality, cardB, cardC, cardZ)).sum(axis=1)
-    Q_C_Z = Q_AAC_Z.sum(axis=0)
-    Q_AA = m.addMVar(shape=(As_as_one_cardinality,), lb=0, ub=1, name="Q_AA")
-    m.addConstr(Q_AA[..., np.newaxis] == Q_AAC_Z.sum(axis=1),
-                name=f"Q_AA from Q_AAC_Z")
+    # Q_C_Z = Q_AAC_Z.sum(axis=0)
+    Q_C_Z = create_NS_distribution(m,
+                                  outcome_cardinalities=(cardC,),
+                                  setting_cardinalities={0: cardZ},
+                                  name="Q_AA",
+                                  impose_normalization=False, impose_nosignalling=False)
+
+    m.addConstr(Q_C_Z == Q_AAC_Z.sum(axis=0),
+                name=f"Q_C_Z from Q_AAC_Z")
+    Q_AA = create_NS_distribution(m,
+                           outcome_cardinalities=(As_as_one_cardinality,),
+                           setting_cardinalities=dict(),
+                           name="Q_AA",
+                           impose_normalization=False, impose_nosignalling=False)
+    m.addConstr(Q_AA == Q_AAC_Z[..., 0].sum(axis=1), name=f"Q_AA from Q_AAC_Z")
     Q_AA_reshaped_for_multiplication = Q_AA.reshape((As_as_one_cardinality, 1, 1))
     Q_C_Z_reshaped_for_multiplication = Q_C_Z[np.newaxis, np.s_[:], np.s_[:]]
     m.addConstr(Q_AAC_Z == Q_C_Z_reshaped_for_multiplication * Q_AA_reshaped_for_multiplication,
