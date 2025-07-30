@@ -43,7 +43,7 @@ def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True, stop_if_violat
             v__2 = m.addVar(lb=0, ub=1, name="v^2")
             m.addConstr(v__2 == v ** 2)
             v__3 = m.addVar(lb=0, ub=1, name="v^3")
-            m.addConstr(v__3 == v * u__2)
+            m.addConstr(v__3 == v * v__2)
 
             m.addConstr(u__2 + v__2 == 1, name="Normalization parameters 1")
             m.addConstr(lambda_0__2 + lambda_1__2 == 1, name="Normalization parameters 2")
