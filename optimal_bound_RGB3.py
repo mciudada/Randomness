@@ -49,24 +49,52 @@ def optimal_nonclassical_bound_RGB3(cardL: int, print_model=True, stop_if_violat
             m.addConstr(lambda_0__2 + lambda_1__2 == 1, name="Normalization parameters 2")
 
             # Define RGB3 distribution in terms of parameters
-            p_ABC = m.addMVar((3, 3, 3), lb=0, name="p_ABC")
-            for (i, j, k) in np.ndindex(3, 3, 3):
-                if (i, j, k) == (0, 0, 1) or (i, j, k) == (0, 1, 0) or (i, j, k) == (1, 0, 0):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__4) * (lambda_0__2) * (u__2) + (lambda_0__4) * (
-                                lambda_1__2) * (v__2))
-                elif (i, j, k) == (0, 0, 2) or (i, j, k) == (0, 2, 0) or (i, j, k) == (2, 0, 0):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__4) * (lambda_0__2) * (v__2) + (lambda_0__4) * (
-                                lambda_1__2) * (u__2))
-                elif (i, j, k) == (1, 1, 2) or (i, j, k) == (1, 2, 1) or (i, j, k) == (2, 1, 1):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__3 * u__2 * v - lambda_0__3 * v__2 * u) ** 2)
-                elif (i, j, k) == (1, 2, 2) or (i, j, k) == (2, 2, 1) or (i, j, k) == (2, 1, 2):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__3 * u * v__2 + lambda_0__3 * v * u__2) ** 2)
-                elif (i, j, k) == (1, 1, 1):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__3 * u__3 + lambda_0__3 * v__3) ** 2)
-                elif (i, j, k) == (2, 2, 2):
-                    m.addConstr(p_ABC[i, j, k] == (lambda_1__3 * v__3 - lambda_0__3 * u__3) ** 2)
-                else:
-                    m.addConstr(p_ABC[i, j, k] == 0)
+            p001 = m.addVar(lb=0, ub=1, name="p001")
+            p002 = m.addVar(lb=0, ub=1, name="p002")
+            p112 = m.addVar(lb=0, ub=1, name="p112")
+            p122 = m.addVar(lb=0, ub=1, name="p122")
+            p111 = m.addVar(lb=0, ub=1, name="p111")
+            p222 = m.addVar(lb=0, ub=1, name="p222")
+            sqrtp112 = m.addVar(lb=-1, ub=1, name="sqrtp112")
+            sqrtp122 = m.addVar(lb=0, ub=1, name="sqrtp122")
+            sqrtp111 = m.addVar(lb=0, ub=1, name="sqrtp111")
+            sqrtp222 = m.addVar(lb=-1, ub=1, name="sqrtp222")
+            m.addConstr(p112 == sqrtp112 ** 2)
+            m.addConstr(p122 == sqrtp122 ** 2)
+            m.addConstr(p111 == sqrtp111 ** 2)
+            m.addConstr(p222 == sqrtp222 ** 2)
+
+            m.addConstr(p001 == lambda_1__4 * lambda_0__2 * u__2 + lambda_0__4 * lambda_1__2 * v__2)
+            m.addConstr(p002 == lambda_1__4 * lambda_0__2 * v__2 + lambda_0__4 * lambda_1__2 * u__2)
+            m.addConstr(sqrtp112 == lambda_1__3 * u__2 * v - lambda_0__3 * v__2 * u)
+            m.addConstr(sqrtp122 == lambda_1__3 * u * v__2 + lambda_0__3 * v * u__2)
+            m.addConstr(sqrtp111 == lambda_1__3 * u__3 + lambda_0__3 * v__3)
+            m.addConstr(sqrtp222 == lambda_1__3 * v__3 - lambda_0__3 * u__3)
+
+
+
+
+            p_ABC = np.zeros((3, 3, 3), dtype=object)
+
+            p_ABC[0, 0, 1] = p001
+            p_ABC[0, 1, 0] = p001
+            p_ABC[1, 0, 0] = p001
+
+            p_ABC[0, 0, 2] = p002
+            p_ABC[0, 2, 0] = p002
+            p_ABC[2, 0, 0] = p002
+
+            p_ABC[2, 1, 1] = p112
+            p_ABC[1, 2, 1] = p112
+            p_ABC[1, 1, 2] = p112
+
+            p_ABC[1, 2, 2] = p122
+            p_ABC[2, 1, 2] = p122
+            p_ABC[2, 2, 1] = p122
+
+            p_ABC[1, 1, 1] = p111
+            p_ABC[2, 2, 2] = p222
+            m.update()
 
             # Define objective: a polynomial function, which, when negative, certifies nonclassicality.
             ineq = m.addVar(lb = -10, ub=10, name="ineq")
