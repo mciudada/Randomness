@@ -76,4 +76,89 @@ def prob_postquantum(E1, E2, E3):
                         + ap*bp*cp*E3)
     return p
 
+def prob_ent(): # Entanglement-swapping
+    p=np.zeros((2,2,2,2,2))
+    
+    phi = bell_state(state='00') 
+    rho1 = ket2dm(phi) 
+    rho2 = rho1
+    rho = tensor(rho1,rho2)
+    
+    A=np.zeros((2, 2, 2, 2),dtype = 'complex_') 
+    C=np.zeros(16,dtype = 'complex_').reshape([2,2,2,2]) 
+    
+    A0 = (1/np.sqrt(2))*(sigmax() - sigmaz()) 
+    A1 = (1/np.sqrt(2))*(sigmax() + sigmaz()) 
+    eival_A0,eivect_A0 = A0.eigenstates() 
+    eival_A1,eivect_A1 = A1.eigenstates() 
+    
+    A[:,:,0,0] = np.dot(eivect_A0[0].full(),eivect_A0[0].dag().full()) 
+    A[:,:,0,1] = np.dot(eivect_A0[1].full(),eivect_A0[1].dag().full()) 
+    A[:,:,1,0] = np.dot(eivect_A1[0].full(),eivect_A1[0].dag().full())
+    A[:,:,1,1] = np.dot(eivect_A1[1].full(),eivect_A1[1].dag().full())
+    
+    C0 = sigmax()
+    C1 = sigmaz()
+    eival_C0,eivect_C0 = C0.eigenstates() 
+    eival_C1,eivect_C1 = C1.eigenstates() 
+    
+    C[:,:,0,0] = np.dot(eivect_C0[0].full(),eivect_C0[0].dag().full()) 
+    C[:,:,0,1] = np.dot(eivect_C0[1].full(),eivect_C0[1].dag().full()) 
+    C[:,:,1,0] = np.dot(eivect_C1[0].full(),eivect_C1[0].dag().full())
+    C[:,:,1,1] = np.dot(eivect_C1[1].full(),eivect_C1[1].dag().full())
+    
+    B=np.zeros(32,dtype = 'complex_').reshape([4,4,2]) 
+    
+    phi_ = bell_state(state='01')
+    psi = bell_state(state='10') 
+    psi_ = bell_state(state='11')
+    
+    B[:,:,0] = ket2dm(psi).full()
+    B[:,:,1] = (ket2dm(phi) + ket2dm(phi_) + ket2dm(psi_)).full()
+    
+    for a, b, c, x, z in np.ndindex(2, 2, 2, 2, 2):
+        p[a,b,c,x,z] = np.trace(np.dot(rho.full(),np.kron(A[:,:,x,a],np.kron(B[:,:,b],C[:,:,z,c]))))
+    
+    return p
+
+
+def prob_Fritz():
+    p = np.zeros((2,2,2,2,2))
+    phi = bell_state(state='00') 
+    rho = ket2dm(phi) 
+    
+    A=np.zeros(16,dtype = 'complex_').reshape([2,2,2,2])
+    B=np.zeros(16,dtype = 'complex_').reshape([2,2,2,2]) 
+    
+    A0 = sigmax()
+    A1 = sigmaz()
+    eival_A0,eivect_A0 = A0.eigenstates() 
+    eival_A1,eivect_A1 = A1.eigenstates() 
+
+    A[:,:,0,0] = np.dot(eivect_A0[0].full(),eivect_A0[0].dag().full()) 
+    A[:,:,0,1] = np.dot(eivect_A0[1].full(),eivect_A0[1].dag().full()) 
+    A[:,:,1,0] = np.dot(eivect_A1[0].full(),eivect_A1[0].dag().full())
+    A[:,:,1,1] = np.dot(eivect_A1[1].full(),eivect_A1[1].dag().full())
+    
+    
+    B0 = (1/np.sqrt(2))*(sigmax() - sigmaz())
+    B1 = (1/np.sqrt(2))*(sigmax() + sigmaz())
+    eival_B0,eivect_B0 = B0.eigenstates() 
+    eival_B1,eivect_B1 = B1.eigenstates() 
+    
+    B[:,:,0,0] = np.dot(eivect_B0[0].full(),eivect_B0[0].dag().full()) 
+    B[:,:,0,1] = np.dot(eivect_B0[1].full(),eivect_B0[1].dag().full()) 
+    B[:,:,1,0] = np.dot(eivect_B1[0].full(),eivect_B1[0].dag().full())
+    B[:,:,1,1] = np.dot(eivect_B1[1].full(),eivect_B1[1].dag().full())
+    
+    pc = np.zeros((2,2))
+    for c, z in np.ndindex(2, 2):
+        pc[c,z] = 1/2
+        
+    for a, b, c, x, z in np.ndindex(2, 2, 2, 2, 2):
+        p[a,b,c,x,z] = pc[c,z] * np.trace(np.dot(rho.full(),np.kron(A[:,:,x,a],B[:,:,c,b])))
+    
+    return p
+
+
 
