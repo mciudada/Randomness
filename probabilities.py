@@ -64,4 +64,16 @@ def prob_MNN(theta): # note that theta cannot be 0, pi/4, pi/2
 
 MNN_specific = prob_MNN(np.pi/8)
 
+def prob_postquantum(E1, E2, E3):
+    p = np.zeros((2, 2, 2, 2, 1, 1, 1, 1))
+    for a, b, c in np.ndindex(2, 2, 2):
+        ap = 2*a-1
+        bp = 2*b-1
+        cp = 2*c-1
+        p[a, b, c, 0] = (1/8) * (1 
+                        + (ap + bp + cp)*E1 
+                        + (ap*bp + bp*cp + cp*ap)*E2 
+                        + ap*bp*cp*E3)
+    return p
+
 
