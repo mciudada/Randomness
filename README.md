@@ -1,4 +1,4 @@
-# Code to accompany "Certifying Randomness or its Lack Thereof in General Network Scenarios"
+# [Code to accompany "Certifying Randomness or its Lack Thereof in General Network Scenarios"](https://arxiv.org/abs/2510.20993)
 
 ## Maria Ciudad Alañón, Daniel Centeno, Andrew Watford and Elie Wolfe
 
