@@ -28,8 +28,10 @@ def parse_p_abc_xyz(s):
 
 
 def maximize_ineq(s: str):
+    print(f"Maximizing inequality {s}")
     parsed_ineq = parse_p_abc_xyz(s)
     (cardA, cardB,cardC, cardX,cardY,cardZ) = np.amax(parsed_ineq, axis=0)+1
+    print(f"cardA={cardA}, cardB={cardB}, cardC={cardC}, cardX={cardX}, cardY={cardY}, cardZ={cardZ}")
 
     with (gp.Env(empty=True) as env):
         env.setParam('OutputFlag', 0)
@@ -106,5 +108,6 @@ def maximize_ineq(s: str):
 
 
 if __name__ == "__main__":
-    for ineq in LO_ineqs:
+    for i, ineq in enumerate(LO_ineqs):
+        print(f"Exploring LO inequality #{i}:")
         maximize_ineq(ineq)
