@@ -20,8 +20,8 @@ def parse_p_abc_xyz(s):
     result = []
     for term in terms:
         left, right = term.split('|')   # e.g. '000', '000'
-        xyz = [int(c) for c in left]    # [0, 0, 0]
-        abc = [int(c) for c in right]   # [0, 0, 0]
+        abc = [int(c) for c in left]    # [0, 0, 0]
+        xyz = [int(c) for c in right]   # [0, 0, 0]
         nums = abc + xyz                # [0, 0, 0, 0, 0, 0]
         result.append(tuple(nums))
     return result
