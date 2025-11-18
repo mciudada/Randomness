@@ -22,7 +22,7 @@ def parse_p_abc_xyz(s):
         left, right = term.split('|')   # e.g. '000', '000'
         xyz = [int(c) for c in left]    # [0, 0, 0]
         abc = [int(c) for c in right]   # [0, 0, 0]
-        nums = xyz + abc                # [0, 0, 0, 0, 0, 0]
+        nums = abc + xyz                # [0, 0, 0, 0, 0, 0]
         result.append(tuple(nums))
     return result
 
@@ -45,6 +45,15 @@ def maximize_ineq(s: str):
             ineq = gp.quicksum(ineq_vars)
             m.setObjective(ineq, gp.GRB.MAXIMIZE)
 
+            m.update()
+            m.optimize()
+            status_message = status_dict.get(m.status, f"Unknown status ({m.status})")
+            # print(f"Model status: {m.status} - {status_message}")
+            # print("Objective value:", m.objVal)
+            # for var in ineq_vars:
+            #     print(var.VarName, " := ", var.X)
+            print("NoSig value:", m.objVal)
+
             unpacked_A_cardinalities = tuple([cardA] * cardX)
             unpacked_B_cardinalities = tuple([cardB] * cardY)
             unpacked_C_cardinalities = tuple([cardC] * cardZ)
@@ -56,12 +65,12 @@ def maximize_ineq(s: str):
                                                impose_normalization=True, impose_nosignalling=True)
             Q_ABBC_XZ = create_NS_distribution(m,
                                                outcome_cardinalities=((cardA,) + unpacked_B_cardinalities + (cardC,)),
-                                               setting_cardinalities={0: cardX, cardY: cardZ},
+                                               setting_cardinalities={0: cardX, cardY+1: cardZ},
                                                name="Q_ABBC_XZ",
                                                impose_normalization=True, impose_nosignalling=True)
             Q_AABC_YZ = create_NS_distribution(m,
                                                outcome_cardinalities=(unpacked_A_cardinalities + (cardB, cardC)),
-                                               setting_cardinalities={cardX - 1: cardY, cardX: cardZ},
+                                               setting_cardinalities={cardX: cardY, cardX+1: cardZ},
                                                name="Q_AABC_YZ",
                                                impose_normalization=True, impose_nosignalling=True)
 
@@ -84,7 +93,6 @@ def maximize_ineq(s: str):
 
 
             # Perform actual optimization
-            # status_message, variable_values = check_feasibility(m, print_model=False)
             m.update()
             m.optimize()
             status_message = status_dict.get(m.status, f"Unknown status ({m.status})")
@@ -92,7 +100,7 @@ def maximize_ineq(s: str):
             # print("Objective value:", m.objVal)
             # for var in ineq_vars:
             #     print(var.VarName, " := ", var.X)
-            print("Objective value:", m.objVal)
+            print("HNSL value:", m.objVal)
             m.dispose()
         env.dispose()
 
