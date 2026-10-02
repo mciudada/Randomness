@@ -4,7 +4,7 @@
 
 This repository contains the codes used to obtain all the results in "Certifying Randomness or its Lack Thereof in Network Scenarios". Maria Ciudad Alañón, Daniel Centeno, Andrew Watford and Elie Wolfe.
 
-All the code is written in Python. Part of the codes use the inflation library (and all its requirements) to solve inflation problems. Others used the solver Gurobi to solve linear and bilinear problems.
+All the code is written in Python. Part of the codes use the [inflation library](https://github.com/ecboghiu/inflation) (and all its requirements) to solve inflation problems. Others used the solver Gurobi to solve linear and bilinear problems.
 
 The files used for the results of the paper are:
 
@@ -14,4 +14,4 @@ The files used for the results of the paper are:
 - [randomness_triangle.py](randomness_triangle.py): this file uses the inflation package to prove randomness in the triangle scenario.
 - [triangle_two_classical_sources.py](triangle_two_classical_sources.py): this file uses Gurobi to find a model with two classical sources in the triangle given the correlation and the cardinality of one of those sources.
 
-The rest of the files have been used internally but are not used for the results shown in the paper.
+The rest of the files (bilocality_bob_lack_randomness.py, bipartite_lack_randomness_triangle.py, optimal_bound_RGB3.py, total_lack_randomness_triangle.py) have been used internally but are not used for the results shown in the paper.
