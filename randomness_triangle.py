@@ -1,6 +1,5 @@
 import numpy as np
 from inflation import InflationProblem, InflationLP
-from qutip import *
 from probabilities import prob_postquantum
 
 # Defining the scenario
